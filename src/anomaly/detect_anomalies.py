@@ -35,28 +35,30 @@ df["rolling_zscore"] = df["rolling_zscore"].fillna(0)
 # Time-based feature
 df["transaction_date"] = pd.to_datetime(df["transaction_date"])
 df["hour"] = df["transaction_date"].dt.hour
+# Convert hour to cyclical features
+df['hour_sin'] = np.sin(2 * np.pi * df['hour'] / 24)
+df['hour_cos'] = np.cos(2 * np.pi * df['hour'] / 24)
+
 
 # -----------------------------
 # Isolation Forest (High Precision Mode)
 # -----------------------------
-features = df[["log_amount"]]  # strongest signal only
+features = df[["log_amount", "txn_count", "rolling_zscore", "hour_sin", "hour_cos"]]
+ # strongest signal only
 scaler = StandardScaler()
 features_scaled = scaler.fit_transform(features)
 
 model = IsolationForest(
-    n_estimators=200,
-    contamination=0.02,  # match synthetic 2% anomalies
+    n_estimators=300,       # slightly higher for stability
+    contamination=0.02,     # match synthetic 2% anomalies
     random_state=42
 )
-model.fit(features_scaled)
 
-# Anomaly scores
-df["anomaly_score"] = model.score_samples(features_scaled)
+# Train model and predict anomalies in one step
+df["predicted_anomaly"] = model.fit_predict(features_scaled)
 
-# Flag top 2% most anomalous
-threshold = df["anomaly_score"].quantile(0.02)
-df["predicted_anomaly"] = (df["anomaly_score"] <= threshold).astype(int)
-
+# Map the output to 0/1 (IsolationForest gives 1 for normal, -1 for anomaly)
+df["predicted_anomaly"] = df["predicted_anomaly"].map({1: 0, -1: 1})
 # -----------------------------
 # Evaluation
 # -----------------------------
