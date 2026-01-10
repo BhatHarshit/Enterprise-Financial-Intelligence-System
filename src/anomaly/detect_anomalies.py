@@ -35,11 +35,37 @@ df["transaction_date"] = pd.to_datetime(df["transaction_date"])
 df["hour"] = df["transaction_date"].dt.hour
 df["hour_sin"] = np.sin(2 * np.pi * df["hour"] / 24)
 df["hour_cos"] = np.cos(2 * np.pi * df["hour"] / 24)
+df["day_of_week"] = df["transaction_date"].dt.dayofweek
+df["day_of_week_sin"] = np.sin(2 * np.pi * df["day_of_week"] / 7)
+df["day_of_week_cos"] = np.cos(2 * np.pi * df["day_of_week"] / 7)
+
+# Transaction velocity: transactions per day per account
+# Transaction count per day per account
+df["txn_date"] = df["transaction_date"].dt.date
+txn_per_day = df.groupby(["account_id", "txn_date"])["transaction_id"].count().reset_index()
+txn_per_day.rename(columns={"transaction_id": "txn_per_day"}, inplace=True)
+
+# Merge back to main df
+df = df.merge(txn_per_day, on=["account_id", "txn_date"], how="left")
+
+# Amount relative to account history
+df["mean_account_amount"] = df.groupby("account_id")["amount"].transform("mean")
+df["amount_ratio"] = df["amount"] / (df["mean_account_amount"] + 1e-6)
+
+# Merchant & Category frequency
+df["merchant_freq"] = df.groupby(["account_id", "merchant"])["amount"].transform("count")
+df["category_freq"] = df.groupby(["account_id", "category"])["amount"].transform("count")
 
 # -----------------------------
 # Prepare features
 # -----------------------------
-features = df[["log_amount", "txn_count", "rolling_zscore", "hour_sin", "hour_cos"]]
+features = df[
+    [
+        "log_amount", "txn_count", "rolling_zscore",
+        "hour_sin", "hour_cos", "day_of_week_sin", "day_of_week_cos",
+        "txn_per_day", "amount_ratio", "merchant_freq", "category_freq"
+    ]
+]
 
 # Scale features
 scaler = StandardScaler()
@@ -48,11 +74,10 @@ features_scaled = scaler.fit_transform(features)
 # -----------------------------
 # Isolation Forest
 # -----------------------------
-# Remove contamination parameter to allow full score evaluation
 model = IsolationForest(
-    n_estimators=500,    # increase for stability
+    n_estimators=500,
     max_samples='auto',
-    contamination='auto', # auto lets the model adjust internally
+    contamination='auto',
     random_state=42
 )
 
@@ -62,8 +87,7 @@ model.fit(features_scaled)
 # -----------------------------
 # Anomaly Scores
 # -----------------------------
-# Negative scores indicate more anomalous
-df["anomaly_score"] = -model.score_samples(features_scaled)
+df["anomaly_score"] = -model.score_samples(features_scaled)  # higher = more anomalous
 
 # Determine threshold automatically using actual anomalies for maximum F1
 best_f1 = 0
