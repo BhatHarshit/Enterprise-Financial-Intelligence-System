@@ -140,36 +140,52 @@ y_scores = df["anomaly_score"]
 
 precision_vals, recall_vals, thresholds = precision_recall_curve(y_true, y_scores)
 
-# Plot PR curve
-plt.figure(figsize=(7,5))
-plt.plot(recall_vals, precision_vals, label='PR Curve')
-plt.xlabel('Recall')
-plt.ylabel('Precision')
-plt.title('Precision-Recall Curve')
-plt.grid(True)
-plt.legend()
-plt.show()
+# -----------------------------
+# Final Threshold Selection
+# -----------------------------
+# Compute F1-maximizing threshold (existing)
+best_f1 = 0
+best_f1_threshold = 0
+for threshold in np.linspace(df["anomaly_score"].min(), df["anomaly_score"].max(), 1000):
+    predicted = (df["anomaly_score"] >= threshold).astype(int)
+    f1_val = f1_score(df["is_anomaly"], predicted)
+    if f1_val > best_f1:
+        best_f1 = f1_val
+        best_f1_threshold = threshold
 
-# Find threshold with precision >= 0.75 and highest recall
-best_threshold_custom = 0
-best_recall = 0
+# Compute custom high-precision threshold (Precision >= 0.75, maximize Recall)
+target_precision = 0.75
+best_custom_threshold = 0
+best_custom_recall = 0
 for p, r, t in zip(precision_vals, recall_vals, list(thresholds) + [thresholds[-1]]):
-    if p >= 0.75 and r > best_recall:
-        best_recall = r
-        best_threshold_custom = t
+    if p >= target_precision and r > best_custom_recall:
+        best_custom_recall = r
+        best_custom_threshold = t
 
-print(f"--- Custom threshold (Precision>=0.75, max Recall): {best_threshold_custom:.4f} ---")
-print(f"📈 Achieved Recall at this threshold: {best_recall:.2f}")
+# Decide final threshold: pick the one that maximizes recall without reducing precision
+if best_custom_recall > recall_score(df["is_anomaly"], (df["anomaly_score"] >= best_f1_threshold).astype(int)):
+    final_threshold = best_custom_threshold
+    final_threshold_type = f"Custom threshold (Precision >= {target_precision})"
+else:
+    final_threshold = best_f1_threshold
+    final_threshold_type = "F1-maximizing threshold"
 
+# Apply final threshold
+df["predicted_anomaly"] = (df["anomaly_score"] >= final_threshold).astype(int)
 
-print(f"📊 Average Precision (PR AUC): {pr_auc:.4f}")
-print(f"📊 ROC-AUC: {roc_auc:.4f}")
+# -----------------------------
+# Final Evaluation
+# -----------------------------
+precision = precision_score(df["is_anomaly"], df["predicted_anomaly"])
+recall = recall_score(df["is_anomaly"], df["predicted_anomaly"])
+f1 = f1_score(df["is_anomaly"], df["predicted_anomaly"])
+cm = confusion_matrix(df["is_anomaly"], df["predicted_anomaly"])
 
-
+print(f"--- Final threshold chosen: {final_threshold_type}: {final_threshold:.4f} ---")
 print(f"🎯 Precision: {precision:.2f}")
 print(f"📈 Recall:    {recall:.2f}")
 print(f"💡 F1-Score:  {f1:.2f}")
 print("Confusion Matrix:")
 print(cm)
-print(f"--- Best threshold based on F1: {best_threshold:.4f} ---")
-print(f"📊 Average Precision (PR AUC): {avg_precision:.4f}")
+print(f"📊 Average Precision (PR AUC): {pr_auc:.4f}")
+print(f"📊 ROC-AUC: {roc_auc:.4f}")
