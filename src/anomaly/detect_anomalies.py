@@ -89,7 +89,12 @@ model.fit(features_scaled)
 # -----------------------------
 df["anomaly_score"] = -model.score_samples(features_scaled)  # higher = more anomalous
 
-# Determine threshold automatically using actual anomalies for maximum F1
+# -----------------------------
+# Evaluation with improved metrics
+# -----------------------------
+from sklearn.metrics import precision_recall_curve, average_precision_score
+
+# F1-based threshold (existing logic)
 best_f1 = 0
 best_threshold = 0
 for threshold in np.linspace(df["anomaly_score"].min(), df["anomaly_score"].max(), 1000):
@@ -98,17 +103,19 @@ for threshold in np.linspace(df["anomaly_score"].min(), df["anomaly_score"].max(
     if f1 > best_f1:
         best_f1 = f1
         best_threshold = threshold
-
-# Apply best threshold
 df["predicted_anomaly"] = (df["anomaly_score"] >= best_threshold).astype(int)
 
-# -----------------------------
-# Evaluation
-# -----------------------------
+# Metrics for F1-maximizing threshold
 precision = precision_score(df["is_anomaly"], df["predicted_anomaly"])
 recall = recall_score(df["is_anomaly"], df["predicted_anomaly"])
 f1 = f1_score(df["is_anomaly"], df["predicted_anomaly"])
 cm = confusion_matrix(df["is_anomaly"], df["predicted_anomaly"])
+
+# Precision-Recall curve & average precision
+y_true = df["is_anomaly"].values
+y_scores = df["anomaly_score"].values
+precision_vals, recall_vals, thresholds = precision_recall_curve(y_true, y_scores)
+avg_precision = average_precision_score(y_true, y_scores)
 
 print(f"🎯 Precision: {precision:.2f}")
 print(f"📈 Recall:    {recall:.2f}")
@@ -116,3 +123,4 @@ print(f"💡 F1-Score:  {f1:.2f}")
 print("Confusion Matrix:")
 print(cm)
 print(f"--- Best threshold based on F1: {best_threshold:.4f} ---")
+print(f"📊 Average Precision (PR AUC): {avg_precision:.4f}")
