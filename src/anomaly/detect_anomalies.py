@@ -116,6 +116,55 @@ y_true = df["is_anomaly"].values
 y_scores = df["anomaly_score"].values
 precision_vals, recall_vals, thresholds = precision_recall_curve(y_true, y_scores)
 avg_precision = average_precision_score(y_true, y_scores)
+from sklearn.metrics import average_precision_score, roc_auc_score
+
+# -----------------------------
+# Additional metrics
+# -----------------------------
+# Use the anomaly_score for continuous evaluation
+y_true = df["is_anomaly"]
+y_scores = df["anomaly_score"]
+
+# Average Precision (PR AUC)
+pr_auc = average_precision_score(y_true, y_scores)
+# ROC-AUC
+roc_auc = roc_auc_score(y_true, y_scores)
+from sklearn.metrics import precision_recall_curve
+import matplotlib.pyplot as plt
+
+# -----------------------------
+# Precision-Recall Curve & Threshold Tuning
+# -----------------------------
+y_true = df["is_anomaly"]
+y_scores = df["anomaly_score"]
+
+precision_vals, recall_vals, thresholds = precision_recall_curve(y_true, y_scores)
+
+# Plot PR curve
+plt.figure(figsize=(7,5))
+plt.plot(recall_vals, precision_vals, label='PR Curve')
+plt.xlabel('Recall')
+plt.ylabel('Precision')
+plt.title('Precision-Recall Curve')
+plt.grid(True)
+plt.legend()
+plt.show()
+
+# Find threshold with precision >= 0.75 and highest recall
+best_threshold_custom = 0
+best_recall = 0
+for p, r, t in zip(precision_vals, recall_vals, list(thresholds) + [thresholds[-1]]):
+    if p >= 0.75 and r > best_recall:
+        best_recall = r
+        best_threshold_custom = t
+
+print(f"--- Custom threshold (Precision>=0.75, max Recall): {best_threshold_custom:.4f} ---")
+print(f"📈 Achieved Recall at this threshold: {best_recall:.2f}")
+
+
+print(f"📊 Average Precision (PR AUC): {pr_auc:.4f}")
+print(f"📊 ROC-AUC: {roc_auc:.4f}")
+
 
 print(f"🎯 Precision: {precision:.2f}")
 print(f"📈 Recall:    {recall:.2f}")
