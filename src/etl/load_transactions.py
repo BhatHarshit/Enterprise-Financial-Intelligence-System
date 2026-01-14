@@ -1,20 +1,71 @@
+"""
+Enterprise ETL Pipeline
+- Schema-aligned with generated financial data
+- SQLite-safe
+"""
+
 import pandas as pd
 import sqlite3
+from pathlib import Path
+from .transform import transform_data
 
-DB_PATH = "database/finance.db"
-CSV_PATH = "src/data/transactions.csv"
 
-df = pd.read_csv(CSV_PATH)
 
-conn = sqlite3.connect(DB_PATH)
+# -------------------------------
+# CONFIG
+# -------------------------------
 
-df.to_sql(
-    name="transactions",
-    con=conn,
-    if_exists="append",
-    index=False
-)
+BASE_DIR = Path(__file__).resolve().parents[2]
+DATA_PATH = BASE_DIR / "src" / "data" / "transactions.csv"
+DB_PATH = BASE_DIR / "database" / "finance.db"
 
-conn.close()
 
-print(f"✅ Loaded {len(df)} transactions into SQL database")
+# -------------------------------
+# EXTRACT
+# -------------------------------
+
+def extract_data():
+    return pd.read_csv(DATA_PATH)
+
+
+# -------------------------------
+# LOAD
+# -------------------------------
+
+def load_to_db(df: pd.DataFrame):
+    conn = sqlite3.connect(DB_PATH)
+
+    df.to_sql(
+        "transactions",
+        conn,
+        if_exists="append",
+        index=False,
+        chunksize=500,      # ✅ prevents SQL variable overflow
+        method=None
+    )
+
+    conn.commit()
+    conn.close()
+
+
+# -------------------------------
+# RUNNER
+# -------------------------------
+
+def run_etl():
+    print("🚀 Starting ETL pipeline")
+
+    df_raw = extract_data()
+    print(f"📥 Extracted {len(df_raw)} records")
+
+    df_clean = transform_data(df_raw)
+    print(f"🧹 Cleaned to {len(df_clean)} records")
+
+    load_to_db(df_clean)
+    print("✅ Loaded into SQLite successfully")
+
+    print("🎯 ETL completed")
+
+
+if __name__ == "__main__":
+    run_etl()
