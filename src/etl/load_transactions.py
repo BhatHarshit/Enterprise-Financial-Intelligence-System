@@ -10,7 +10,6 @@ from pathlib import Path
 from .transform import transform_data
 
 
-
 # -------------------------------
 # CONFIG
 # -------------------------------
@@ -34,7 +33,17 @@ def extract_data():
 
 def load_to_db(df: pd.DataFrame):
     conn = sqlite3.connect(DB_PATH)
+    cur = conn.cursor()
 
+    # -------------------------------
+    # Clear the table first to prevent UNIQUE constraint errors
+    # -------------------------------
+    cur.execute("DELETE FROM transactions;")
+    conn.commit()
+
+    # -------------------------------
+    # Insert new clean data
+    # -------------------------------
     df.to_sql(
         "transactions",
         conn,
