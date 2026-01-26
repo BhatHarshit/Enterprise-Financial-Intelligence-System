@@ -1,4 +1,5 @@
 # Enterprise Financial Intelligence System
+ Project Status: Actively under further development
 
 An enterprise-grade financial analytics platform for detecting anomalies, forecasting KPIs, and delivering actionable insights through dashboards.
 
