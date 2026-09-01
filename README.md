@@ -1,5 +1,5 @@
 # Enterprise Financial Intelligence System
- Project Status: Actively under further development using power bi and other
+ Project Status: Actively under further development using power bi and other systems
 
 An enterprise-grade financial analytics platform for detecting anomalies, forecasting KPIs, and delivering actionable insights through dashboards.
 
